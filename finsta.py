@@ -128,12 +128,18 @@ def logout():
     session.pop("username")
     return redirect("/")
 
-
+#Project 3.3
 @app.route("/uploadImage", methods=["POST"])
 @login_required
 def upload_image():
+    imageToUpload = input("Location of the photo: \n")
+    allFollowers = input("Visible to All Followers? (Yes/No)")
+    if allFollowers == "Yes" or allFollowers == "yes":
+        allFollowers = True
+    if allFollowers == "No" or allFollowers == "no":
+        allFollowers = False
     if request.files:
-        image_file = request.files.get("imageToUpload", "")
+        image_file = request.files.get(imageToUpload, "")
         image_name = image_file.filename
         filepath = os.path.join(IMAGES_DIR, image_name)
         image_file.save(filepath)
@@ -141,13 +147,22 @@ def upload_image():
         with connection.cursor() as cursor:
             cursor.execute(query, (time.strftime('%Y-%m-%d %H:%M:%S'), image_name))
         message = "Image has been successfully uploaded."
+        query = "UPDATE Photos" \
+                "SET allFollowers = %s" \
+                "WHERE " \
+                "   (   SELECT filepath" \
+                "       FROM Photos AS p1" \
+                "       WHERE p1.filepath = %s" \
+                "   )"
+        with connection.cursor as cursor:
+            cursor.execute(query, allFollowers, filepath)
         return render_template("upload.html", message=message)
     else:
         message = "Failed to upload image."
         return render_template("upload.html", message=message)
 
 
-#Project 3.1
+#Project 3
 @app.route("/image/<image_name>", methods=["GET"])
 @login_required
 def find_image(test_user):
@@ -158,16 +173,33 @@ def find_image(test_user):
     data = cursor.fetchall()
     return render_template("images.html", images=data)
 
-#Project 3.2
+#Project 3.1 and 3.2
 @app.route("/images", methods=["GET"])
 @login_required
 def find_images(test_user):
     with connection.cursor() as cursor:
-        query = "SELECT photoID, photoPoster, postingdate FROM Photo WHERE" \
-                "(SELECT groupName FROM BelongTo WHERE owner_name = photoPoster, member_name =%s)" \
+        query = "SELECT photoID, photoPoster, postingdate, filepath " \
+                "FROM Photo AS PH1 " \
+                "WHERE" \
+                "   (   SELECT groupName " \
+                "       FROM BelongTo " \
+                "       WHERE owner_name = PH1.photoPoster, member_name = %s" \
+                "   )" \
                 "=" \
-                "(SELECT groupName FROM SharedWith WHERE groupOwner = photoPoster)" \
-                "ORDER BY postingdate DESC"
+                "   (   SELECT groupName " \
+                "       FROM SharedWith " \
+                "       WHERE groupOwner = PH1.photoPoster" \
+                "   )" \
+                "ORDER BY postingdate DESC" \
+                "SELECT firstname, lastname" \
+                "FROM Person AS p1" \
+                "WHERE PH1.photoPoster = p1.username" \
+                "SELECT username" \
+                "FROM Tagged = t1" \
+                "WHERE PH1.photoID = t1.photoID AND t1.tagstatus == TRUE" \
+                "SELECT username, rating" \
+                "FROM Likes AS l1" \
+                "WHERE PH1.photoID = l1.photoID"
         cursor.execute(query, test_user)
     data = cursor.fetchall()
     return render_template("images.html", images=data)
