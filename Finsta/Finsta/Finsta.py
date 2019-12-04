@@ -174,7 +174,7 @@ def find_image(test_user):
     return render_template("images.html", images=data)
 
 #Project 3.1 and 3.2
-@app.route("/images", methods=["GET"])
+@app.route("/image", methods=["GET"])
 @login_required
 def find_images(test_user):
     with connection.cursor() as cursor:
@@ -203,6 +203,104 @@ def find_images(test_user):
         cursor.execute(query, test_user)
     data = cursor.fetchall()
     return render_template("images.html", images=data)
+
+#Project 4a
+@app.route("/followers", methods=["GET"])
+@login_required
+def follow():
+    followed = input("User to follow: ")
+    with connection.cursor() as cursor:
+        query = "ALTER TABLE Follow" \
+                "ADD acceptedFollow boolean" \
+                "UPDATE Follow" \
+                "SET acceptedFollow = False" \
+                "WHERE" \
+                "   (   SELECT username_follower" \
+                "       FROM Follow AS f1" \
+                "       WHERE" \
+                "           (   SELECT username" \
+                "               FROM Person AS p1" \
+                "               WHERE p1.username = f1.username_follower" \
+                "           )" \
+                "   )"
+        cursor.execute(query)
+    data = cursor.fetchall()
+    return render_template("followers.html", followers=data)
+
+#Project 4b
+@app.route("/followers", methods=["GET"])
+@login_required
+def manage_follows():
+    with connection.cursor() as cursor:
+        query = "SELECT username_follower" \
+                "FROM Follow as f1" \
+                "WHERE f1.acceptedFollow = False"
+        if (input("Accept follow? ") == "YES" or "Y"):
+            query +=    "UPDATE Follow" \
+                        "SET f1.acceptedFollow = True" \
+                        "WHERE " + input("Accept follow? ") + " = 'YES'"
+        elif (input("Accept follow? ") == "NO" or "N"):
+            query +=    "UPDATE Follow" \
+                        "SET f1.acceptedFollow = True" \
+                        "WHERE " + input("Accept follow? ") + " = 'YES'"
+        cursor.execute(query)
+    data = cursor.fetchall()
+    return render_template("followers.html", followers=data)
+
+#Project 12
+@app.route("/groups", methods=["GET"])
+@login_required
+def add_friendgroup(test_user):
+    group_name = input("New Group Name: ")
+    with connection.cursor() as cursor:
+        find_query =    "SELECT groupName" \
+                        "FROM Friendgroup" \
+                        "WHERE" \
+                        "   (   SELECT username" \
+                        "       FROM Person" \
+                        "       WHERE username = %s" \
+                        "   )"
+        cursor.execute(find_query, test_user)
+        find_data = cursor.fetchall()
+        if (find_data is None):
+            message = "Group created"
+            query = "INSERT INTO Friendgroup (groupOwner, groupName)" \
+                    "VALUES (%s, %s)"
+            cursor.execute(query, test_user, group_name)
+            return render_template("groups.html", message=message)
+        if (find_data is not None):
+            message = "Group already exists"
+            return render_template("groups.html", message=message)
+
+#Project 13
+@app.route("/newFriend", methods=["GET"])
+@login_required
+def add_friend(test_user):
+    new_friend = input("Username of the new friend? ")
+    friend_group = input("Add to which group: ")
+    with connection.cursor() as cursor:
+        find_query =    "SELECT groupName" \
+                        "FROM Friendgroup" \
+                        "WHERE groupOwner = %s"
+        cursor.execute(find_query, test_user)
+        find_data = cursor.fetchall()
+        find_user = "SELECT member_username" \
+                    "FROM BelongTo" \
+                    "WHERE member_username = %s"
+        cursor.execute(find_user, new_friend)
+        user = cursor.fetchall()
+        if (find_data is not None) and (user is None):
+            message = "Friend added"
+            query = "INSERT INTO BelongTo (member_username, owner_username, groupName)" \
+                    "VALUES (%s, %s, %s)"
+            cursor.execute(query, new_friend, test_user, friend_group)
+            return render_template("newFriend.html", message=message)
+        elif (find_data is None):
+            message = "Group does not exist"
+            return render_template("newFriend.html", message=message)
+        elif (user is not None):
+            message = "Member already in group"
+            return render_template("newFriend.html", message=message)
 
 if __name__ == "__main__":
     if not os.path.isdir("images"):
